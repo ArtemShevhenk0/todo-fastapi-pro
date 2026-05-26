@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+from fastapi.staticfiles import StaticFiles
+
 from app.database import engine, Base
 from app.api.tasks import router as tasks_router
 from app.api.auth import router as auth_router
@@ -13,6 +15,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan, title="ToDo Pro API")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(auth_router)
 app.include_router(tasks_router)

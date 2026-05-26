@@ -12,6 +12,7 @@ class Task(Base):
     description: Mapped[Optional[str]] = mapped_column()
     priority: Mapped[int] = mapped_column(default=1)
     done: Mapped[bool] = mapped_column(default=False)
+    image_path: Mapped[str] = mapped_column(nullable=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     owner: Mapped["User"] = relationship(back_populates="tasks")
 

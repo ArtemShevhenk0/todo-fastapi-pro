@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+import os
+import uuid
+from pickletools import TAKEN_FROM_ARGUMENT1
+
+from fastapi import APIRouter, Depends, HTTPException, Path, status, Form, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -13,20 +17,48 @@ from app.schemas import TaskAdd, TaskResponse, TaskUpdate
 # tags=["Tasks"] — это для красоты в Swagger
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
+
 @router.post("/")
 async def create_task(
-        item: TaskAdd,
-        current_user_id: str = Depends(get_current_user),
-        session: AsyncSession = Depends(get_session)
+        title: str = Form(min_length=5, max_length=50),
+        description: str = Form(None, max_length=500),
+        priority: int = Form(default=1, ge = 1, le=5),
+        file: UploadFile = File(None),
+        session: AsyncSession = Depends(get_session),
+        user_id: str = Depends(get_current_user)
 ):
-    task_data = item.model_dump()
-    task_data["user_id"] = int(current_user_id)
-    new_task = Task(**task_data)
-    session.add(new_task)
-    await session.commit()
-    await session.refresh(new_task)
+    filename = None
 
-    return {"status": "success", "task_id": new_task.id}
+    if file and file.filename != '':
+        ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(status_code=400, detail=f"Format .{ext} not allowed")
+
+        filename = f"task_{uuid.uuid4().hex[:8]}.{ext}"
+        save_path = os.path.join('static/uploads/tasks', filename)
+
+        content = await file.read()
+        with open(save_path, 'wb') as f:
+            f.write(content)
+    try:
+        new_task = Task(
+            title = title,
+            description = description,
+            priority = priority,
+            image_path=filename,
+            user_id = int(user_id)
+
+        )
+        session.add(new_task)
+        await session.commit()
+        await session.refresh(new_task)
+    except Exception as e:
+        await session.rollback()
+        print(f"DATABASE ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Database save error")
+
 
 @router.get("/", response_model=list[TaskResponse])
 async def get_tasks(session: AsyncSession = Depends(get_session),
@@ -36,12 +68,12 @@ async def get_tasks(session: AsyncSession = Depends(get_session),
     tasks = result.scalars().all()
     return tasks
 
-@router.delete("/{task_id}")
+@router.delete("/{id}")
 async def delete_task(
-        task_id: int,
+        id: int,
         session: AsyncSession = Depends(get_session),
         current_user_id: str = Depends(get_current_user)):
-    task = await session.get(Task, task_id)
+    task = await session.get(Task, id)
     if not task:
         raise HTTPException(status_code=404, detail="Not Found")
     if task.user_id != int(current_user_id):
