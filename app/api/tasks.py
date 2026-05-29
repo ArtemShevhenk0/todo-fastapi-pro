@@ -1,6 +1,5 @@
 import os
 import uuid
-from pickletools import TAKEN_FROM_ARGUMENT1
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status, Form, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +10,7 @@ from sqlalchemy import select
 from app.auth_utils import get_current_user
 from app.database import get_session
 from app.models import Task
-from app.schemas import TaskAdd, TaskResponse, TaskUpdate
+from app.schemas import TaskResponse, TaskUpdate
 
 # prefix="/tasks" значит, что нам больше не нужно писать /tasks в каждом роуте!
 # tags=["Tasks"] — это для красоты в Swagger

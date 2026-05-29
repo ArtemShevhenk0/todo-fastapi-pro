@@ -58,6 +58,12 @@ function displayTasks(data) {
     data.sort((a, b) => a.id - b.id);
     let allHtml = '';
     data.forEach((task) => {
+        const imgHtml = task.image_path 
+        ? `<img  src="/static/uploads/tasks/${task.image_path}" 
+            class="rounded shadow-sm border" 
+            style="width: 120px; height: 80px; object-fit: cover; cursor: pointer;" 
+            onclick="window.open(this.src)">` 
+        : '';
         const html = `
         <div class="d-flex align-items-center justify-content-between border rounded p-2 mb-2 bg-white">
                 
@@ -66,6 +72,7 @@ function displayTasks(data) {
                     <b class="text-nowrap">Title: ${task.title}</b>
                     <span class="text-muted text-nowrap">Description: ${task.description || 'No description'}</span>
                     <span class="badge bg-secondary text-nowrap">Priority: ${task.priority}</span>
+                    ${imgHtml}
                 </div>
 
                 <div >

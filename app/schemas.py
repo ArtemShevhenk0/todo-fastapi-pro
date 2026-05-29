@@ -1,14 +1,13 @@
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 
-from sqlalchemy.sql.operators import like_op
-
 
 class TaskAdd(BaseModel):
     title: str = Field(min_length=5, max_length=50)
     description: str | None = Field(None, max_length=500)
     priority: int = Field(default=1, ge = 1, le=5)
     done: bool = Field(default=False)
+    image_path: str | None = Field(None)
 
 
 class TaskResponse(TaskAdd):
