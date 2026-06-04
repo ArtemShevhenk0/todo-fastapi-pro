@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
@@ -12,6 +14,7 @@ async def lifespan(app: FastAPI):
     # Код запуска (создание таблиц)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    os.makedirs('static/uploads/tasks', exist_ok=True)
     yield
 
 app = FastAPI(lifespan=lifespan, title="ToDo Pro API")
