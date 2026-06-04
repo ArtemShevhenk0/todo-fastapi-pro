@@ -16,6 +16,12 @@ class TaskResponse(TaskAdd):
     class Config():
         form_attributes = True
 
+class TaskListResponse(BaseModel):
+    items: list[TaskResponse]
+    total: int
+    page: int
+    pages: int
+
 class TaskUpdate(BaseModel):
     title: Optional[str] = Field(None,min_length=5, max_length=50)
     description: Optional[str] = Field(None,max_length=500)

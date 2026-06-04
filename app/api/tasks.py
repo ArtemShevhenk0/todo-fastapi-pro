@@ -1,16 +1,17 @@
+import math
 import os
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status, Form, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 
 #Для задач
 from app.auth_utils import get_current_user
 from app.database import get_session
 from app.models import Task
-from app.schemas import TaskResponse, TaskUpdate
+from app.schemas import TaskResponse, TaskUpdate, TaskListResponse
 
 # prefix="/tasks" значит, что нам больше не нужно писать /tasks в каждом роуте!
 # tags=["Tasks"] — это для красоты в Swagger
@@ -59,13 +60,35 @@ async def create_task(
         raise HTTPException(status_code=500, detail="Database save error")
 
 
-@router.get("/", response_model=list[TaskResponse])
+@router.get("/", response_model=TaskListResponse)
 async def get_tasks(session: AsyncSession = Depends(get_session),
+                    page: int = 1,
+                    search: str = None,
                     user_id: str = Depends(get_current_user)):
-    query = select(Task).filter_by(user_id = int(user_id))
-    result = await session.execute(query)
+
+    per_page = 5
+    skip = (page - 1) * per_page
+
+    query = select(Task).where(Task.user_id == int(user_id))
+    if search:
+        query = query.where(Task.title.ilike(f"{search}%"))
+
+    total = await session.scalar(
+        select(func.count()).select_from(query.subquery())
+    )
+
+    result = await session.execute(
+        query.order_by(Task.id.desc()).limit(per_page).offset(skip)
+    )
     tasks = result.scalars().all()
-    return tasks
+
+    total_pages = math.ceil(total / per_page)
+    return {
+        "items": tasks,
+        "total": total,
+        "page": page,
+        "pages": total_pages,
+    }
 
 @router.delete("/{id}")
 async def delete_task(

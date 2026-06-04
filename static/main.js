@@ -1,3 +1,31 @@
+let current_page = 1;
+let total_pages = 1;
+
+async function apiRequest(url, method, body = null ) {
+    const token = localStorage.getItem('my_token');
+
+    let headers = {
+        'Authorization': `Bearer ${token}`
+    };
+
+    let finalBody = body;
+    if(body && !(body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+        finalBody = JSON.stringify(body);
+    }
+
+    const response = await fetch(url, {
+            method: method,
+            headers: headers,
+            body: finalBody
+        });
+
+    return {
+        ok: response.ok,
+        status: response.status,
+        data: await response.json()
+    };
+}
 async function login() {
     const user = document.getElementById("user").value
     const password = document.getElementById("password").value
@@ -24,30 +52,25 @@ async function login() {
 }
 
 async function getTask() {
-    const token = localStorage.getItem('my_token');
+    const search = document.getElementById('search-input').value;
 
-    if (!token) {
-        console.log('Нужно войти в аккаунт')
-        return
-    }
+    const result = await apiRequest(`/tasks/?page=${current_page}&search=${search}`, 'GET');
 
-    const response = await fetch('/tasks/',{
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`, 
-            'Accept': 'application/json'
-        }
-    });
-    const data = await response.json();
-    if(response.ok) {
-        displayTasks(data)
-    } else if (response.status === 401){
+    if(result.ok) {
+        total_pages = result.data.pages;
+        displayTasks(result.data.items)
+    } else if (result.status === 401){
         localStorage.removeItem('my_token');
         toggleUI();
 
     } else {
-        alert("Ошибка:" + data.detail)
+        alert("Ошибка:" + result.data.detail)
     }
+
+    const page_info = document.getElementById('page-info');
+    document.getElementById('next-page').disabled = (current_page >= total_pages || total_pages === 0);
+    document.getElementById('prev-page').disabled = (current_page === 1);
+    if (page_info) page_info.innerText = `${current_page} of ${total_pages}`
     
 }
 
@@ -55,7 +78,6 @@ function displayTasks(data) {
     const container = document.getElementById('task-list')
     container.innerHTML = ''
 
-    data.sort((a, b) => a.id - b.id);
     let allHtml = '';
     data.forEach((task) => {
         const imgHtml = task.image_path 
@@ -102,58 +124,39 @@ async function createTask() {
         formData.append('file', imageFile.files[0]);
     }
 
-    const response = await fetch('/tasks/',{
-        method: 'POST',
-        body: formData,
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    });
-    const data = await response.json();
-    if (response.ok) {
+    const result = await apiRequest('/tasks/', 'POST', formData);
+    
+    if (result.ok) {
         titleIn.value = '';
         descriptionIn.value = '';
         prioritySe.value = '1';
+        imageFile.value = '';
         await getTask()
     } else {
-        alert(data.detail)
+        alert(result.data.detail)
     }
     
 }
 
 async function deleteTask(id) {
-    const token = localStorage.getItem('my_token');
+    confirm('Are you sure?')
+    const result = await apiRequest(`/tasks/${id}`, 'DELETE')
 
-    const response = await fetch (`/tasks/${id}`, {
-        method: 'DELETE',
-        headers: {'Authorization': `Bearer ${token}`}
-    });
-    const data = await response.json();
-
-    if (response.ok) {
+    if (result.ok) {
         await getTask();
     } else {
-        alert(data.detail);
+        alert(result.data.detail)
     }
 }
 
 async function toggleDone(id, isDone) {
     const token = localStorage.getItem('my_token');
 
-    const response = await fetch (`/tasks/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({done: isDone}),
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        }
-    });
-
-    const data = await response.json();
-    if (response.ok) {
+    const result = await apiRequest(`/tasks/${id}`, 'PATCH', {done: isDone})
+    if (result.ok) {
         await getTask();
     } else {
-        alert(data.detail)
+        alert(result.data.detail)
     }
     
 }
@@ -189,6 +192,29 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     toggleUI();
 });
 
+document.addEventListener('click', async (event)=>{
+    const btn = event.target.closest('#add-task-btn');
+
+    if(!btn) return;
+    
+    const btn_text = document.getElementById('btn-text');
+    const btn_spinner = document.getElementById('btn-spinner');
+    
+    try{
+        btn.disabled = true;
+        btn_text.classList.add('d-none')
+        btn_spinner.classList.remove('d-none')
+        await createTask();
+    } catch (error) {
+        console.error("Ошибка при создании задачи:", error);
+    } finally {
+        btn.disabled = false;
+        btn_text.classList.remove('d-none')
+        btn_spinner.classList.add('d-none')
+    }
+
+});
+
 document.getElementById('task-list').addEventListener('click', async (event) => {
     const btn = event.target.closest('[data-action]');
     if (!btn) return;
@@ -199,6 +225,7 @@ document.getElementById('task-list').addEventListener('click', async (event) => 
     const isDone = btn.classList.contains('btn-danger');
     
     if(action === 'delete'){
+
         await deleteTask(id);
     }
     if (action === 'done'){
@@ -207,4 +234,24 @@ document.getElementById('task-list').addEventListener('click', async (event) => 
     }
     
     
+});
+
+document.getElementById('button-section').addEventListener('click', async (event)=> {
+    const btn = event.target.id;
+    if(btn === 'next-page'){
+        current_page++
+        console.log(current_page)
+        await getTask()
+    }
+    if(btn === 'prev-page'){
+        if (current_page > 1) current_page--
+        await getTask()
+    }
+});
+
+let timeout;
+
+document.getElementById('search-input').addEventListener('input', async ()=>{
+    clearTimeout(timeout)
+    timeout = setTimeout(() => {current_page = 1;getTask();}, 500)
 });

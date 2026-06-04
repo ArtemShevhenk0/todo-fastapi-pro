@@ -14,7 +14,7 @@
         <input type="text" name="user" id="user" value="">
         <input type="password" name="password" id="password" value="">
         <input type="submit" value="Sign in" onclick="login()">
-        </div>
+    </div>
     <div class="container mt-3" id="main-section">
         <button class="btn btn-danger" onclick="logout()">Logout</button>
         <h5>Create Task</h5>
@@ -29,8 +29,19 @@
               <option value="4">4</option>
               <option value="5">5</option>
           </select>
-        <input type="submit" value="Create Task" onclick="createTask()">
+        <button id="add-task-btn" type="submit" class="btn btn-warning w-100 py-2">
+            <span id="btn-text">Add New Task</span>
+            <span id="btn-spinner" class="spinner-border spinner-border-sm d-none"></span>
+        </button>
+        <div class="alert alert-danger mt-3" id="alert-danger">
+            <input type="search" class="form-control rounded-4 flex-grow-1" id="search-input" placeholder="Search Task" >
+        </div>
         <div id="task-list"></div>
+            <div class="container mt-3" id="button-section">
+            <button id="prev-page">Back</button>
+            <button id="next-page">Next</button>
+            Page <span id="page-info">1</span>
+        </div>
     </div>
 </body>
 
