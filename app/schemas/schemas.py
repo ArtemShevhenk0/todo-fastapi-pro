@@ -13,6 +13,9 @@ class TaskAdd(BaseModel):
 class TaskResponse(TaskAdd):
     id: int
     user_id: int
+    ai_summary: Optional[str]
+    ai_tags: Optional[str]
+    ai_difficulty: Optional[int]
     class Config():
         form_attributes = True
 
@@ -43,4 +46,7 @@ class UserResponse(UserBase):
 class UserLogin(BaseModel):
     user: str = Field(min_length=5, max_length=50)
     password: str = Field(min_length=5, max_length=70)
+
+class ChatRequest(BaseModel):
+    message: str
 

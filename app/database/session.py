@@ -1,9 +1,9 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
-from app.config import DB_URL
+from app.core.config import settings
 
 #DB_URL = "postgresql+asyncpg://artem:prikol@localhost:5432/fastapi_todo"
-engine = create_async_engine(DB_URL)
+engine = create_async_engine(settings.DATABASE_URL)
 new_session = async_sessionmaker(
     bind=engine,           # Привязываем к нашему двигателю
     expire_on_commit=False # Чтобы объекты не "протухали" после сохранения

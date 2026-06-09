@@ -6,58 +6,53 @@ from fastapi import APIRouter, Depends, HTTPException, Path, status, Form, File,
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-
+from app.repositories.task import TaskRepository, get_task_repository
+from app.services.ai_logic import AIService, get_ai_service
+from app.services.file_service import FileService, get_file_service
 #Для задач
-from app.auth_utils import get_current_user
-from app.database import get_session
-from app.models import Task
-from app.schemas import TaskResponse, TaskUpdate, TaskListResponse
+from app.services.security import get_current_user
+from app.database.session import get_session
+from app.models.models import Task
+from app.schemas.schemas import TaskUpdate, TaskListResponse, TaskResponse, ChatRequest
 
 # prefix="/tasks" значит, что нам больше не нужно писать /tasks в каждом роуте!
 # tags=["Tasks"] — это для красоты в Swagger
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
 
-@router.post("/")
+@router.post("/", response_model= TaskResponse)
 async def create_task(
         title: str = Form(min_length=5, max_length=50),
         description: str = Form(None, max_length=500),
         priority: int = Form(default=1, ge = 1, le=5),
         file: UploadFile = File(None),
-        session: AsyncSession = Depends(get_session),
+        task_repo: TaskRepository = Depends(get_task_repository),
+        file_service: FileService = Depends(get_file_service),
+        ai_service: AIService = Depends(get_ai_service),
         user_id: str = Depends(get_current_user)
 ):
     filename = None
+    if file and file.filename:
+        try:
+            filename = await file_service.save_task_image(file)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
-    if file and file.filename != '':
-        ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
-        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-        if ext not in ALLOWED_EXTENSIONS:
-            raise HTTPException(status_code=400, detail=f"Format .{ext} not allowed")
+    ai_data = await ai_service.analyze_task(title,description)
+    task_data = {
+        "title": title,
+        "description": description,
+        "priority": priority,
+        "image_path": filename,
+        "user_id": int(user_id),
+        "ai_summary": ai_data['summary'],
+        "ai_tags": ai_data['tags'],
+        "ai_difficulty": ai_data['difficulty'],
+    }
+    new_task = await task_repo.create_task(task_data)
+    return new_task
 
-        filename = f"task_{uuid.uuid4().hex[:8]}.{ext}"
-        save_path = os.path.join('static/uploads/tasks', filename)
-
-        content = await file.read()
-        with open(save_path, 'wb') as f:
-            f.write(content)
-    try:
-        new_task = Task(
-            title = title,
-            description = description,
-            priority = priority,
-            image_path=filename,
-            user_id = int(user_id)
-
-        )
-        session.add(new_task)
-        await session.commit()
-        await session.refresh(new_task)
-    except Exception as e:
-        await session.rollback()
-        print(f"DATABASE ERROR: {e}")
-        raise HTTPException(status_code=500, detail="Database save error")
 
 
 @router.get("/", response_model=TaskListResponse)
@@ -130,3 +125,15 @@ async def get_tasks_priority(
     tasks = result.scalars().all()
 
     return tasks
+
+@router.post("/chat")
+async def chat_manager(
+        item: ChatRequest,
+        user_id: str = Depends(get_current_user),
+        task_repo: TaskRepository = Depends(get_task_repository),
+        ai_service: AIService = Depends(get_ai_service)
+        ):
+    tasks = await task_repo.get_active_tasks(int(user_id))
+    request = await ai_service.chat_with_manager(item.message, tasks)
+    return request
+

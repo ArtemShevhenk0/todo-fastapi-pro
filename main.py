@@ -4,16 +4,14 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
 
-from app.database import engine, Base
-from app.api.tasks import router as tasks_router
-from app.api.auth import router as auth_router
-import app.models
+from app.database.session import engine, Base
+from app.api.v1.tasks import router as tasks_router
+from app.api.v1.auth import router as auth_router
+import app.models.models
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Код запуска (создание таблиц)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     os.makedirs('static/uploads/tasks', exist_ok=True)
     yield
 

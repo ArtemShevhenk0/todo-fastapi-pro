@@ -2,7 +2,7 @@ from typing import Optional
 
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.database import Base
+from app.database.session import Base
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -15,6 +15,9 @@ class Task(Base):
     image_path: Mapped[str] = mapped_column(nullable=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     owner: Mapped["User"] = relationship(back_populates="tasks")
+    ai_summary: Mapped[str] = mapped_column(nullable=True)
+    ai_tags: Mapped[str] = mapped_column(nullable=True)
+    ai_difficulty: Mapped[Optional[int]]
 
 class User(Base):
     __tablename__ = "users"
